@@ -33,6 +33,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font
 .handle-input{border:1px solid var(--line);background:#fff;width:150px;font-size:13px;
   padding:5px 8px;border-radius:6px;font-family:var(--mono)}
 .handle-input:focus{outline:2px solid var(--ink);outline-offset:0;border-color:var(--ink)}
+.handle-input:read-only{background:#eef1f4;color:var(--muted);cursor:default}
+.handle-form .btn-mini{flex-shrink:0}
 
 .container{max-width:1180px;margin:24px auto;padding:0 24px;display:grid;gap:18px}
 
@@ -108,6 +110,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font
     <span class="mono muted">handle:</span>
     <input class="handle-input" id="uHandle" placeholder="ecarrillovaz"
            title="Este handle aparece en la columna A del formato">
+    <button class="btn-mini hidden" id="btnHandleEdit" type="button" title="Cambiar handle">✎</button>
   </div>
 </header>
 
@@ -263,12 +266,41 @@ $("uHandle").value = data.profile.handle || "";
 $("cfgName").value = data.profile.name || "";
 $("cfgRecipient").value = data.profile.recipient || "";
 $("fDate").value = `${view.y}-${pad(view.m)}-01`;
+applyHandleLockState();
 render();
+
+/* El handle se escribe una sola vez: al salir del campo con un valor
+   capturado, queda guardado y bloqueado, para no tener que volver a
+   escribirlo en cada registro. El lápiz lo desbloquea si hay que
+   corregirlo. */
+function applyHandleLockState() {
+  const locked = !!(data.profile.handle && data.profile.handleLocked);
+  $("uHandle").readOnly = locked;
+  $("btnHandleEdit").classList.toggle("hidden", !locked);
+}
 
 $("uHandle").addEventListener("input", () => {
   data.profile.handle = $("uHandle").value.trim();
   save(); render();
 });
+$("uHandle").addEventListener("blur", () => {
+  const v = $("uHandle").value.trim();
+  if (!v) return;
+  const wasLocked = data.profile.handleLocked;
+  data.profile.handle = v;
+  data.profile.handleLocked = true;
+  save();
+  applyHandleLockState();
+  if (!wasLocked) flash("Handle guardado. No hace falta volver a escribirlo.", "ok");
+});
+$("btnHandleEdit").addEventListener("click", () => {
+  data.profile.handleLocked = false;
+  save();
+  applyHandleLockState();
+  $("uHandle").focus();
+  $("uHandle").select();
+});
+
 $("cfgName").addEventListener("input", () => {
   data.profile.name = $("cfgName").value.trim(); save();
 });
@@ -416,6 +448,12 @@ function render() {
 const HEADERS = ["Handle","Overtime Date","Week*","Overtime Total (Hours)",
                  "OT Type","Case # (AVAYA o CLIENTE)","Reason","COMMENTS - "];
 const WIDTHS = [36.57, 24.43, 27.14, 19.14, 14.86, 33.57, 146.0, 65.14];
+const THIN_BORDER = {
+  top: { style: "thin", color: { argb: "FF9E9E9E" } },
+  left: { style: "thin", color: { argb: "FF9E9E9E" } },
+  bottom: { style: "thin", color: { argb: "FF9E9E9E" } },
+  right: { style: "thin", color: { argb: "FF9E9E9E" } },
+};
 
 async function buildWorkbookBuffer(y, m) {
   const entries = entriesFor(y, m);
@@ -430,6 +468,7 @@ async function buildWorkbookBuffer(y, m) {
     c.value = h;
     c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD8D8D8" } };
     c.font = { name: "Arial", size: 10, bold: true };
+    c.border = THIN_BORDER;
   });
 
   entries.forEach((e, i) => {
@@ -446,7 +485,10 @@ async function buildWorkbookBuffer(y, m) {
     r.getCell(7).alignment = { wrapText: true, vertical: "top" };
     r.getCell(8).value = e.comments || "";
     r.getCell(8).alignment = { wrapText: true, vertical: "top" };
-    for (let c = 1; c <= 8; c++) r.getCell(c).font = body;
+    for (let c = 1; c <= 8; c++) {
+      r.getCell(c).font = body;
+      r.getCell(c).border = THIN_BORDER;
+    }
   });
 
   return wb.xlsx.writeBuffer();
