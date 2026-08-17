@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Overtime Tracker · Horas Extras</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<style>
+:root {
+  --bg:#eef1f4; --surface:#fff; --ink:#17232e; --muted:#6b7a88; --line:#d8dfe6;
+  --accent:#c8102e; --accent-ink:#fff; --ok:#1f7a4d; --header-fill:#d8d8d8;
+  --radius:10px;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --sans:"IBM Plex Sans",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.45}
+.mono{font-family:var(--mono)} .muted{color:var(--muted)} .center{text-align:center}
+.hidden{display:none!important}
+
+.brand-row{display:flex;align-items:center;gap:8px}
+.brand-dot{width:10px;height:10px;border-radius:50%;background:var(--accent)}
+.brand-mono{font-family:var(--mono);font-weight:600;letter-spacing:2px;font-size:12px}
+.page-title{max-width:1180px;margin:20px auto 0;padding:0 24px}
+.page-title h1{margin:0;color:var(--accent);font-family:var(--mono);
+  font-weight:700;letter-spacing:1.5px;font-size:26px;text-transform:uppercase}
+
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:14px 24px;
+  background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10;flex-wrap:wrap;gap:10px}
+.handle-form{display:flex;align-items:center;gap:6px;font-size:13px}
+.handle-input{border:1px solid var(--line);background:#fff;width:150px;font-size:13px;
+  padding:5px 8px;border-radius:6px;font-family:var(--mono)}
+.handle-input:focus{outline:2px solid var(--ink);outline-offset:0;border-color:var(--ink)}
+
+.container{max-width:1180px;margin:24px auto;padding:0 24px;display:grid;gap:18px}
+
+.period-bar{display:flex;flex-wrap:wrap;align-items:center;gap:16px;background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--radius);padding:14px 18px}
+.period-nav{display:flex;align-items:center;gap:10px}
+.period-nav h1{margin:0;font-size:20px;min-width:190px;text-align:center}
+.period-stats{display:flex;gap:14px;margin-left:auto;font-family:var(--mono)}
+.stat b{font-size:17px}
+.stat.total b{color:var(--accent)}
+.period-actions{display:flex;gap:10px;flex-wrap:wrap}
+
+.btn{display:inline-block;padding:9px 16px;border-radius:8px;border:1px solid var(--line);
+  background:#fff;color:var(--ink);font-weight:600;text-decoration:none;cursor:pointer;font-size:14px;font-family:var(--sans)}
+.btn:hover{border-color:var(--ink)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn-primary:hover{filter:brightness(.92)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-mini{border:1px solid var(--line);background:#fff;border-radius:6px;padding:2px 7px;cursor:pointer;font-size:12px}
+.btn-mini.danger:hover{border-color:var(--accent);color:var(--accent)}
+
+.entry-card,.table-card,.settings-card{background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--radius);padding:18px}
+.entry-card h2,.settings-card h2{margin:0 0 14px;font-size:16px}
+.entry-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px 14px}
+.entry-grid label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600}
+.entry-grid .span2{grid-column:span 2}
+.entry-grid input,.entry-grid select,.entry-grid textarea,.settings-card input{
+  border:1px solid var(--line);border-radius:7px;padding:8px 10px;font:inherit;font-weight:400;background:#fff}
+.entry-grid textarea{resize:vertical}
+.entry-grid input:focus,.entry-grid select:focus,.entry-grid textarea:focus,.settings-card input:focus{
+  outline:2px solid var(--ink);outline-offset:0;border-color:var(--ink)}
+.entry-grid button.span2{align-self:end}
+.settings-grid{display:grid;grid-template-columns:2fr 3fr;gap:12px 14px}
+.settings-grid label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600}
+.settings-card .fine{font-size:12px;color:var(--muted);margin-top:10px}
+
+.ot-table{width:100%;border-collapse:collapse;font-size:13.5px}
+.ot-table th{background:var(--header-fill);text-align:left;padding:8px 10px;font-size:12px;
+  border-bottom:2px solid #bcbcbc;white-space:nowrap}
+.ot-table td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.ot-table td.wrap{max-width:420px}
+.ot-table tbody tr:hover{background:#f7f9fb}
+.ot-table tfoot td{font-weight:700;background:#f7f9fb;border-top:2px solid #bcbcbc}
+.empty{text-align:center;color:var(--muted);padding:40px 0}
+
+.flash-stack{position:fixed;top:16px;right:16px;z-index:100;display:grid;gap:8px}
+.flash{background:var(--ink);color:#fff;border-radius:8px;padding:10px 16px;font-size:14px;
+  box-shadow:0 6px 20px rgba(0,0,0,.2)}
+.flash-ok{background:var(--ok)} .flash-error{background:var(--accent)}
+
+@media(max-width:820px){
+  .entry-grid{grid-template-columns:1fr 1fr}
+  .settings-grid{grid-template-columns:1fr}
+  .ot-table td.wrap{max-width:none}
+  .period-stats{margin-left:0}
+}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<div class="flash-stack" id="flashes"></div>
+
+<header class="topbar">
+  <div class="brand-row">
+    <span class="brand-dot"></span>
+    <span class="brand-mono">OVERTIME&nbsp;TRACKER</span>
+  </div>
+  <div class="handle-form">
+    <span class="mono muted">handle:</span>
+    <input class="handle-input" id="uHandle" placeholder="ecarrillovaz"
+           title="Este handle aparece en la columna A del formato">
+  </div>
+</header>
+
+<div class="page-title">
+  <h1>AVAYA Overtime Hours Registration</h1>
+</div>
+
+<main class="container">
+  <section class="period-bar">
+    <div class="period-nav">
+      <button class="btn" id="btnPrev" aria-label="Mes anterior">←</button>
+      <h1 id="periodTitle"></h1>
+      <button class="btn" id="btnNext" aria-label="Mes siguiente">→</button>
+    </div>
+    <div class="period-stats">
+      <span class="stat"><b id="statCount">0</b> registros</span>
+      <span class="stat total"><b id="statTotal">0</b> h</span>
+    </div>
+    <div class="period-actions">
+      <button class="btn" id="btnExport">Descargar Excel</button>
+      <button class="btn btn-primary" id="btnSend">Enviar por correo</button>
+    </div>
+  </section>
+
+  <section class="entry-card">
+    <h2>Nueva hora extra</h2>
+    <form id="entryForm" class="entry-grid">
+      <label>Fecha
+        <input type="date" id="fDate" required>
+      </label>
+      <label>Semana <span class="muted">(auto)</span>
+        <input type="number" id="fWeek" min="1" max="6" placeholder="auto">
+      </label>
+      <label>Horas
+        <input type="number" id="fHours" step="0.5" min="0.5" max="24" required>
+      </label>
+      <label>Tipo
+        <select id="fType">
+          <option>OT (Overtime)</option>
+          <option>DT (Double Time)</option>
+        </select>
+      </label>
+      <label>Case # (AVAYA o CLIENTE)
+        <input class="mono" id="fCase" placeholder="opcional">
+      </label>
+      <label class="span2">Reason
+        <textarea id="fReason" rows="2" required
+          placeholder="Descripción de la actividad realizada"></textarea>
+      </label>
+      <label class="span2">Comments
+        <textarea id="fComments" rows="1" placeholder="opcional"></textarea>
+      </label>
+      <button class="btn btn-primary span2" type="submit">Guardar registro</button>
+    </form>
+  </section>
+
+  <section class="settings-card">
+    <h2>Correo destino</h2>
+    <div class="settings-grid">
+      <label>Tu nombre <span class="muted">(aparece en el cuerpo del correo)</span>
+        <input type="text" id="cfgName" placeholder="Ezequiel Carrillo">
+      </label>
+      <label>Correo destino
+        <input type="email" id="cfgRecipient" placeholder="supervisor@empresa.com">
+      </label>
+    </div>
+    <p class="fine">"Enviar por correo" descarga el Excel del mes y abre Gmail
+    en una pestaña nueva con destinatario, asunto y cuerpo ya llenos —
+    solo arrastra el archivo descargado a esa ventana antes de enviar,
+    porque el navegador no puede adjuntarlo por ti automáticamente.</p>
+  </section>
+
+  <section class="table-card">
+    <table class="ot-table" id="tblWrap">
+      <thead>
+        <tr>
+          <th>Handle</th><th>Fecha</th><th>Sem</th><th>Horas</th>
+          <th>Tipo</th><th>Case #</th><th>Reason</th><th>Comments</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="tblBody"></tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3">Total del mes</td>
+          <td id="tfootTotal">0</td>
+          <td colspan="5"></td>
+        </tr>
+      </tfoot>
+    </table>
+    <div class="empty hidden" id="emptyMsg"></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+const MESES = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO",
+               "AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+const MESES_CAP = MESES.map(m => m[0] + m.slice(1).toLowerCase());
+const STORE_KEY = "overtimeTrackerData_v1";
+
+let data = { profile: {}, entries: [] };
+let view = { y: new Date().getFullYear(), m: new Date().getMonth() + 1 };
+
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2, "0");
+const periodKey = (y, m) => `${y}-${pad(m)}`;
+
+function flash(msg, cls = "") {
+  const d = document.createElement("div");
+  d.className = "flash " + (cls ? "flash-" + cls : "");
+  d.textContent = msg;
+  $("flashes").appendChild(d);
+  setTimeout(() => d.remove(), 6000);
+}
+function esc(s) {
+  const d = document.createElement("div");
+  d.textContent = s ?? "";
+  return d.innerHTML;
+}
+function weekOfMonth(dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  const first = new Date(d.getFullYear(), d.getMonth(), 1);
+  const firstDow = (first.getDay() + 6) % 7; // lunes = 0
+  return Math.floor((d.getDate() + firstDow - 1) / 7) + 1;
+}
+function entriesFor(y, m) {
+  const p = periodKey(y, m);
+  return data.entries.filter(e => e.date.startsWith(p)).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/* ------------------------- persistencia local ------------------------
+   Todo se guarda en este navegador (localStorage). No hay login ni
+   servidor: si cambias de equipo o navegador, empiezas de cero ahí. */
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) data = JSON.parse(raw);
+  } catch { /* ignore */ }
+  data.profile ??= {};
+  data.entries ??= [];
+}
+function save() {
+  localStorage.setItem(STORE_KEY, JSON.stringify(data));
+}
+
+/* ------------------------------- init -------------------------------- */
+load();
+$("uHandle").value = data.profile.handle || "";
+$("cfgName").value = data.profile.name || "";
+$("cfgRecipient").value = data.profile.recipient || "";
+$("fDate").value = `${view.y}-${pad(view.m)}-01`;
+render();
+
+$("uHandle").addEventListener("change", () => {
+  data.profile.handle = $("uHandle").value.trim();
+  save(); render();
+});
+$("cfgName").addEventListener("change", () => {
+  data.profile.name = $("cfgName").value.trim(); save();
+});
+$("cfgRecipient").addEventListener("change", () => {
+  data.profile.recipient = $("cfgRecipient").value.trim(); save();
+});
+
+$("btnPrev").addEventListener("click", () => {
+  view.m--; if (view.m < 1) { view.m = 12; view.y--; }
+  $("fDate").value = `${view.y}-${pad(view.m)}-01`; render();
+});
+$("btnNext").addEventListener("click", () => {
+  view.m++; if (view.m > 12) { view.m = 1; view.y++; }
+  $("fDate").value = `${view.y}-${pad(view.m)}-01`; render();
+});
+
+/* ----------------------------- captura ----------------------------- */
+$("entryForm").addEventListener("submit", ev => {
+  ev.preventDefault();
+  const date = $("fDate").value;
+  const hours = parseFloat($("fHours").value);
+  const reason = $("fReason").value.trim();
+  if (!date || !(hours > 0 && hours <= 24) || !reason) {
+    flash("Fecha, horas o reason inválidos.", "error"); return;
+  }
+  const weekRaw = $("fWeek").value.trim();
+  data.entries.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    date,
+    week: weekRaw ? parseInt(weekRaw) : weekOfMonth(date),
+    hours,
+    type: $("fType").value,
+    caseNo: $("fCase").value.trim(),
+    reason,
+    comments: $("fComments").value.trim(),
+  });
+  save();
+  view = { y: +date.slice(0, 4), m: +date.slice(5, 7) };
+  $("entryForm").reset();
+  $("fDate").value = date;
+  render();
+  flash("Registro guardado.", "ok");
+});
+
+function deleteEntry(id) {
+  if (!confirm("¿Eliminar este registro?")) return;
+  data.entries = data.entries.filter(e => e.id !== id);
+  save(); render();
+  flash("Registro eliminado.", "ok");
+}
+
+/* ------------------------- vista previa (tabla) ---------------------- */
+function render() {
+  const entries = entriesFor(view.y, view.m);
+  const handle = data.profile.handle || "";
+  const total = entries.reduce((s, e) => s + e.hours, 0);
+
+  $("periodTitle").textContent = `${MESES_CAP[view.m - 1]} ${view.y}`;
+  $("statCount").textContent = entries.length;
+  $("statTotal").textContent = +total.toFixed(2);
+  $("tfootTotal").textContent = +total.toFixed(2);
+  $("btnSend").disabled = entries.length === 0;
+  $("btnExport").disabled = entries.length === 0;
+
+  const body = $("tblBody");
+  body.innerHTML = "";
+  if (!entries.length) {
+    $("tblWrap").classList.add("hidden");
+    $("emptyMsg").classList.remove("hidden");
+    $("emptyMsg").innerHTML = `<p>Sin registros en ${MESES_CAP[view.m-1].toLowerCase()}.
+      Captura tu primera hora extra con el formulario de arriba.</p>`;
+    return;
+  }
+  $("tblWrap").classList.remove("hidden");
+  $("emptyMsg").classList.add("hidden");
+  for (const e of entries) {
+    const [y, m, d] = e.date.split("-");
+    const tr = document.createElement("tr");
+    tr.innerHTML =
+      `<td class="mono">${esc(handle)}</td>` +
+      `<td class="mono">${d}-${MESES_CAP[+m-1].slice(0,3)}</td>` +
+      `<td class="mono center">${e.week}</td>` +
+      `<td class="mono center">${e.hours}</td>` +
+      `<td>${esc(e.type)}</td>` +
+      `<td class="mono">${esc(e.caseNo) || "—"}</td>` +
+      `<td class="wrap">${esc(e.reason)}</td>` +
+      `<td class="wrap muted">${esc(e.comments)}</td>` +
+      `<td><button class="btn-mini danger" title="Eliminar">✕</button></td>`;
+    tr.querySelector("button").addEventListener("click", () => deleteEntry(e.id));
+    body.appendChild(tr);
+  }
+}
+
+/* ================== EXCEL — réplica exacta del formato ==============
+   Hoja "Overtime26", encabezados gris D8D8D8 Arial 10 negrita,
+   anchos de columna originales, fechas mm-dd-yy, cuerpo Calibri 11. */
+const HEADERS = ["Handle","Overtime Date","Week*","Overtime Total (Hours)",
+                 "OT Type","Case # (AVAYA o CLIENTE)","Reason","COMMENTS - "];
+const WIDTHS = [36.57, 24.43, 27.14, 19.14, 14.86, 33.57, 146.0, 65.14];
+
+async function buildWorkbookBuffer(y, m) {
+  const entries = entriesFor(y, m);
+  const handle = data.profile.handle || "";
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Overtime26");
+  ws.columns = WIDTHS.map(w => ({ width: w }));
+
+  const hRow = ws.getRow(1);
+  HEADERS.forEach((h, i) => {
+    const c = hRow.getCell(i + 1);
+    c.value = h;
+    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD8D8D8" } };
+    c.font = { name: "Arial", size: 10, bold: true };
+  });
+
+  entries.forEach((e, i) => {
+    const r = ws.getRow(i + 2);
+    const body = { name: "Calibri", size: 11 };
+    r.getCell(1).value = handle;
+    r.getCell(2).value = new Date(e.date + "T12:00:00Z");
+    r.getCell(2).numFmt = "mm-dd-yy";
+    r.getCell(3).value = e.week;
+    r.getCell(4).value = e.hours;
+    r.getCell(5).value = e.type;
+    r.getCell(6).value = e.caseNo || "";
+    r.getCell(7).value = e.reason;
+    r.getCell(7).alignment = { wrapText: true, vertical: "top" };
+    r.getCell(8).value = e.comments || "";
+    r.getCell(8).alignment = { wrapText: true, vertical: "top" };
+    for (let c = 1; c <= 8; c++) r.getCell(c).font = body;
+  });
+
+  return wb.xlsx.writeBuffer();
+}
+
+const filenameFor = (y, m) => `FORMATO_DE_HORAS_EXTRAS_${MESES[m-1]}_${y}.xlsx`;
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+async function downloadExcel(y, m) {
+  const buf = await buildWorkbookBuffer(y, m);
+  const blob = new Blob([buf], { type: XLSX_MIME });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filenameFor(y, m);
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+$("btnExport").addEventListener("click", () => downloadExcel(view.y, view.m));
+
+/* ------------------- enviar por correo (Gmail prellenado) ------------
+   Un navegador no puede adjuntar archivos a un correo por código; esto
+   descarga el Excel y abre Gmail con destinatario/asunto/cuerpo listos
+   para que solo arrastres el archivo descargado y le des enviar. */
+$("btnSend").addEventListener("click", async () => {
+  const recipient = data.profile.recipient;
+  if (!recipient) { flash("Configura primero el correo destino.", "error"); return; }
+  const entries = entriesFor(view.y, view.m);
+  if (!entries.length) { flash("No hay registros en ese mes; nada que enviar.", "error"); return; }
+
+  const total = +entries.reduce((s, e) => s + e.hours, 0).toFixed(2);
+  const period = `${MESES_CAP[view.m-1]} ${view.y}`;
+  const name = data.profile.name || data.profile.handle || "";
+  const handle = data.profile.handle || "";
+  const fname = filenameFor(view.y, view.m);
+
+  await downloadExcel(view.y, view.m);
+
+  const subject = `Horas extras ${period} - ${name} (${handle})`;
+  const body =
+    `Se adjunta el formato de horas extras correspondiente a ${period}.\n\n` +
+    `Ingeniero: ${name}\nHandle: ${handle}\n` +
+    `Registros declarados: ${entries.length}\nTotal de horas: ${total}\n\n` +
+    `[Adjunta aquí el archivo ${fname} que se acaba de descargar]`;
+
+  const url = "https://mail.google.com/mail/?view=cm&fs=1" +
+    "&to=" + encodeURIComponent(recipient) +
+    "&su=" + encodeURIComponent(subject) +
+    "&body=" + encodeURIComponent(body);
+  window.open(url, "_blank");
+
+  flash(`Excel descargado. Arrastra ${fname} a la ventana de Gmail que se abrió.`, "ok");
+});
+</script>
+</body>
+</html>
