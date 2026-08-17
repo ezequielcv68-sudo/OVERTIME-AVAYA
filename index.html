@@ -130,8 +130,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font
       <span class="stat total"><b id="statTotal">0</b> h</span>
     </div>
     <div class="period-actions">
-      <button class="btn" id="btnExport">Descargar Excel</button>
-      <button class="btn btn-primary" id="btnSend">Enviar por correo</button>
+      <button class="btn" id="btnExport">Download Excel</button>
+      <button class="btn btn-primary" id="btnSend">Send by email</button>
     </div>
   </section>
 
@@ -171,19 +171,19 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font
   </section>
 
   <section class="settings-card">
-    <h2>Correo destino</h2>
+    <h2>Destination email address</h2>
     <div class="settings-grid">
-      <label>Tu nombre <span class="muted">(aparece en el cuerpo del correo)</span>
+      <label>Your Name <span class="muted">(appears in the body of the email)</span>
         <input type="text" id="cfgName" placeholder="Ezequiel Carrillo">
       </label>
-      <label>Correo destino <span class="muted">(Correo de tu Manager)</span>
+      <label>Destination email <span class="muted">(Email from your manager)</span>
         <input type="email" id="cfgRecipient" placeholder="supervisor@empresa.com">
       </label>
     </div>
-    <p class="fine">"Enviar por correo" descarga el Excel del mes y abre Gmail
-    en una pestaña nueva con destinatario, asunto y cuerpo ya llenos —
-    solo arrastra el archivo descargado a esa ventana antes de enviar,
-    porque el navegador no puede adjuntarlo por ti automáticamente.</p>
+    <p class="fine">‘Send by email’ downloads the Excel file for the month and opens Gmail
+    in a new tab with the recipient, subject and body already filled in —
+    simply drag the downloaded file into that window before sending,
+    as the browser cannot attach it for you automatically.</p>
   </section>
 
   <section class="table-card">
@@ -197,7 +197,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font
       <tbody id="tblBody"></tbody>
       <tfoot>
         <tr>
-          <td colspan="3">Total del mes</td>
+          <td colspan="3">Monthly total</td>
           <td id="tfootTotal">0</td>
           <td colspan="5"></td>
         </tr>
