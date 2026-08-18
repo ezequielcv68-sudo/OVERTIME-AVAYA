@@ -509,15 +509,19 @@ async function downloadExcel(y, m) {
 
 $("btnExport").addEventListener("click", () => downloadExcel(view.y, view.m));
 
-/* ------------------- enviar por correo (Gmail prellenado) ------------
-   Un navegador no puede adjuntar archivos a un correo por código; esto
-   descarga el Excel y abre Gmail con destinatario/asunto/cuerpo listos
-   para que solo arrastres el archivo descargado y le des enviar. */
+/* ------------------- enviar por correo (Web Share API + Fallback) ------------ */
 $("btnSend").addEventListener("click", async () => {
   const recipient = data.profile.recipient;
-  if (!recipient) { flash("First, set up the recipient's email address.", "error"); return; }
+  if (!recipient) { 
+    flash("Primero configura el correo del destinatario.", "error"); 
+    return; 
+  }
+  
   const entries = entriesFor(view.y, view.m);
-  if (!entries.length) { flash("There are no records for that month; nothing to send.", "error"); return; }
+  if (!entries.length) { 
+    flash("No hay registros en este mes para enviar.", "error"); 
+    return; 
+  }
 
   const total = +entries.reduce((s, e) => s + e.hours, 0).toFixed(2);
   const period = `${MESES_CAP[view.m-1]} ${view.y}`;
@@ -525,22 +529,45 @@ $("btnSend").addEventListener("click", async () => {
   const handle = data.profile.handle || "";
   const fname = filenameFor(view.y, view.m);
 
-  await downloadExcel(view.y, view.m);
-
   const subject = `Horas extras ${period} - ${name} (${handle})`;
   const body =
     `Se adjunta el formato de horas extras correspondiente a ${period}.\n\n` +
     `Ingeniero: ${name}\nHandle: ${handle}\n` +
     `Registros declarados: ${entries.length}\nTotal de horas: ${total}`;
-    //`[Adjunta aquí el archivo ${fname} que se acaba de descargar]`;
 
-  const url = "https://mail.google.com/mail/?view=cm&fs=1" +
-    "&to=" + encodeURIComponent(recipient) +
-    "&su=" + encodeURIComponent(subject) +
-    "&body=" + encodeURIComponent(body);
-  window.open(url, "_blank");
+  // 1. Generar el buffer y convertirlo a un archivo de sistema en memoria
+  const buf = await buildWorkbookBuffer(view.y, view.m);
+  const file = new File([buf], fname, { type: XLSX_MIME });
 
-  flash(`Excel descargado. Arrastra ${fname} a la ventana de Gmail que se abrió.`, "ok");
+  // 2. Preparar el paquete de datos
+  const shareData = {
+    title: subject,
+    text: body,
+    files: [file]
+  };
+
+  // 3. Evaluar si el sistema (Windows / Móvil) soporta compartir archivos nativos
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share(shareData);
+      flash("Se abrió el menú de envío. Elige tu app de correo.", "ok");
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        flash("Ocurrió un error al intentar compartir.", "error");
+      }
+    }
+  } else {
+    // FALLBACK: Si el navegador bloquea adjuntar archivos directo, baja el Excel y abre Gmail
+    await downloadExcel(view.y, view.m);
+
+    const url = "https://mail.google.com/mail/?view=cm&fs=1" +
+      "&to=" + encodeURIComponent(recipient) +
+      "&su=" + encodeURIComponent(subject) +
+      "&body=" + encodeURIComponent(body);
+    window.open(url, "_blank");
+
+    flash(`Excel descargado. Arrastra ${fname} a la ventana de Gmail abierta.`, "ok");
+  }
 });
 </script>
 </body>
