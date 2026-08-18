@@ -509,7 +509,7 @@ async function downloadExcel(y, m) {
 
 $("btnExport").addEventListener("click", () => downloadExcel(view.y, view.m));
 
-/* ------------------- enviar por correo (Web Share API + Fallback) ------------ */
+/* ------------------- enviar por correo (Web Share API + Fallback Robusto) ------------ */
 $("btnSend").addEventListener("click", async () => {
   const recipient = data.profile.recipient;
   if (!recipient) { 
@@ -539,34 +539,40 @@ $("btnSend").addEventListener("click", async () => {
   const buf = await buildWorkbookBuffer(view.y, view.m);
   const file = new File([buf], fname, { type: XLSX_MIME });
 
-  // 2. Preparar el paquete de datos
   const shareData = {
     title: subject,
     text: body,
     files: [file]
   };
 
-  // 3. Evaluar si el sistema (Windows / Móvil) soporta compartir archivos nativos
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try {
-      await navigator.share(shareData);
-      flash("Se abrió el menú de envío. Elige tu app de correo.", "ok");
-    } catch (err) {
-      if (err.name !== "AbortError") {
-        flash("Ocurrió un error al intentar compartir.", "error");
-      }
-    }
-  } else {
-    // FALLBACK: Si el navegador bloquea adjuntar archivos directo, baja el Excel y abre Gmail
+  // Función interna para el Plan B (Descargar + Abrir Gmail)
+  const ejecutarPlanB = async () => {
     await downloadExcel(view.y, view.m);
-
     const url = "https://mail.google.com/mail/?view=cm&fs=1" +
       "&to=" + encodeURIComponent(recipient) +
       "&su=" + encodeURIComponent(subject) +
       "&body=" + encodeURIComponent(body);
     window.open(url, "_blank");
-
     flash(`Excel descargado. Arrastra ${fname} a la ventana de Gmail abierta.`, "ok");
+  };
+
+  // 2. Intentar usar el menú nativo del sistema operativo
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share(shareData);
+      flash("Se abrió el menú de envío nativo.", "ok");
+    } catch (err) {
+      // Si el usuario simplemente canceló el menú emergente, no hacemos nada.
+      if (err.name === "AbortError") return;
+      
+      // Si Windows / Navegador bloquearon la API, mostramos el error técnico y usamos el Plan B automáticamente
+      console.warn("No se pudo usar Web Share API:", err.message);
+      flash("El sistema bloqueó el envío directo. Abriendo Gmail...", "error");
+      await ejecutarPlanB();
+    }
+  } else {
+    // Si el navegador de plano no soporta compartir archivos nativos
+    await ejecutarPlanB();
   }
 });
 </script>
