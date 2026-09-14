@@ -184,6 +184,19 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font
     in a new tab with the recipient, subject and body already filled in —
     simply drag the downloaded file into that window before sending,
     as the browser cannot attach it for you automatically.</p>
+    
+    <hr style="border:0; border-top:1px solid var(--line); margin:18px 0;">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <div>
+        <h3 style="margin:0; font-size:14px;">Data Backup (JSON)</h3>
+        <p class="fine" style="margin-top:2px;">Download a copy of your records before clearing browser history, or to move data to another device.</p>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn" id="btnExportJson" type="button">Export Backup</button>
+        <button class="btn" id="btnImportJson" type="button">Restore Backup</button>
+        <input type="file" id="fileImportJson" accept=".json" class="hidden">
+      </div>
+    </div>
   </section>
 
   <section class="table-card">
@@ -542,7 +555,52 @@ $("btnSend").addEventListener("click", async () => {
 
   flash(`Excel descargado. Arrastra ${fname} a la ventana de Gmail que se abrió.`, "ok");
 });
+
+/* ------------------------- Respaldos JSON ------------------------- */
+$("btnExportJson").addEventListener("click", () => {
+  const backupData = JSON.stringify(data, null, 2);
+  const blob = new Blob([backupData], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `overtime_backup_${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  flash("Backup exported successfully.", "ok");
+});
+
+$("btnImportJson").addEventListener("click", () => {
+  $("fileImportJson").click();
+});
+
+$("fileImportJson").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    try {
+      const parsed = JSON.parse(evt.target.result);
+      if (!parsed.profile || !Array.isArray(parsed.entries)) {
+        throw new Error("Invalid format");
+      }
+      if (confirm("This will overwrite your current data. Do you want to proceed?")) {
+        data = parsed;
+        save();
+        $("uHandle").value = data.profile.handle || "";
+        $("cfgName").value = data.profile.name || "";
+        $("cfgRecipient").value = data.profile.recipient || "";
+        applyHandleLockState();
+        render();
+        flash("Backup restored successfully.", "ok");
+      }
+    } catch (err) {
+      flash("The selected file is not a valid backup.", "error");
+    }
+    $("fileImportJson").value = "";
+  };
+  reader.readAsText(file);
+});
 </script>
 </body>
 </html>
-
